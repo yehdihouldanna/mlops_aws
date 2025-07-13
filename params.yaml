@@ -9,9 +9,17 @@ train :
   n_estimators: 100
   max_depth: 5
 
-dagshub :
-# dagshub experiment tracking uri : found in experiment onglet
-  MLFLOW_TRACKING_URI : https://dagshub.com/yehdihouldanna/mlpipeline-mlflow-dvc.mlflow
-  MLFLOW_TRACKING_USERNAME : yehdihouldanna
-# this is the token in your profile (default) and you can also copy it from the dvc onglet in the repository
-  MLFLOW_TRACKING_PASSWORD : 28fdecc4cae73c08dadfd562c7bfe688f20b9a78
+# dagshub :
+# # dagshub experiment tracking uri : found in experiment onglet
+#   MLFLOW_TRACKING_URI : https://dagshub.com/yehdihouldanna/mlpipeline-mlflow-dvc.mlflow
+#   MLFLOW_TRACKING_USERNAME : yehdihouldanna
+# # this is the token in your profile (default) and you can also copy it from the dvc onglet in the repository
+#   MLFLOW_TRACKING_PASSWORD : 28fdecc4cae73c08dadfd562c7bfe688f20b9a78
+
+aws :
+  aws_access_key_id: AKIAVTUQT5TNOMMKPHLG
+  aws_secret_access_key: 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
+  region_name: eu-north-1
+
+mlflow:
+  MLFLOW_TRACKING_URI: http://13.53.36.3:5000/
