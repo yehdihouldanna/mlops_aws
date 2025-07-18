@@ -22,4 +22,4 @@ aws :
   region_name: eu-north-1
 
 mlflow:
-  MLFLOW_TRACKING_URI: http://13.53.36.3:5000/
+  MLFLOW_TRACKING_URI: http://13.48.5.125:5000/
