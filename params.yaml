@@ -17,9 +17,9 @@ train :
 #   MLFLOW_TRACKING_PASSWORD : 28fdecc4cae73c08dadfd562c7bfe688f20b9a78
 
 aws :
-  aws_access_key_id: AKIAVTUQT5TNOMMKPHLG
-  aws_secret_access_key: 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
+  aws_access_key_id: *
+  aws_secret_access_key: *
   region_name: eu-north-1
 
 mlflow:
-  MLFLOW_TRACKING_URI: http://13.48.5.125:5000/
+  MLFLOW_TRACKING_URI: http://*:5000/
