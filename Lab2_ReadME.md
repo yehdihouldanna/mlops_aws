@@ -33,7 +33,7 @@ mlops_aws
 │
 ├── data
 ├── models
-├── params.yaml
+├── params.yaml # this is put in git ignore because it contains sensitive ID and Key, a reference of it is given instead
 ├── README.md
 │
 ├── src
@@ -205,10 +205,26 @@ CMD ["uvicorn", "serving.predict_api:app", "--host", "0.0.0.0", "--port", "8000"
 ```
 
 ---
+# Etape 5 - Clonning du code du serveur : 
+
+Actuellement nous clonons la totalité du repository pour la simplicité : 
+mais un approche plus propre, on clonne uniquement les fichier nécessaire pour le serveur de prediciton : 
+
+```bash
+.
+├── params.yaml # Ceci devrait etre recreé manuellement pour stocker les secret aws id et key, et aussi le tracking_uri
+├── Dockerfile
+├── requirements.txt
+├── serving
+│   └── predict_api.py
+```
 
 # Étape 5 — Construction de l’image Docker
 
 Dans le dossier racine du projet :
+
+Recrée votre fichier params.yaml (ceci est dans git ignore à cause des secret id et key)
+du coup après le clonage du dossier de code, on doit recrée le fichier params.yaml
 
 ```
 docker build -t mlflow-model-api .
@@ -220,6 +236,20 @@ docker build -t mlflow-model-api .
 
 ```
 docker run -p 8000:8000 mlflow-model-api
+
+
+```
+
+Mais pour notre container pour qu'il puisse communiquer avec s3 on doit le lancer avec les crédentiels;
+Also allow the port 8000 in the sg for the ec2 instance,
+
+```bash
+docker run -p 8000:8000 \
+  -e AWS_ACCESS_KEY_ID="your_key" \
+  -e AWS_SECRET_ACCESS_KEY="your_secret" \
+  -e AWS_DEFAULT_REGION="your_region" \
+  mlflow-model-api
+
 ```
 
 L’API sera accessible à l’adresse :

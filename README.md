@@ -1,13 +1,22 @@
 # mlops_aws
+
 Cette repository contient la mise en place d'une simple (formulaire web) basé sur un model IA exploité via un API Flask.
-L'objective c'est d'avoir ce modèle suivant un pipeline MLOPS complet, déployé sur l'infrastructure AWS.
+L'objective c'est d'avoir un Pipeline MLOPS Complet pour l'automatisation du système.
+Chaque changement de validation de données va lancer l'entrainement pour la création d'un nouveau modèle à jour, et la rédepoyer.
+Chqua push git va aussi mettre à jour le code du serveur, et relancer aussi l'entrainement du modèle.
+
+ce modèle suivant un pipeline MLOPS complet, déployé sur l'infrastructure AWS.
 Les technologies utilisé : 
 Python, Flask,
 MLFLow, dvc,
 AWS EC2, AWS IAM, AWS S3,
 HTML, CSS, JS (maybe)
+Docker
+GitHub Actions,
 
-# 1. Mise de l'environement MLFLOW sur AWS : 
+
+# LAB 1 : Serveur MLFlow sur EC2 + Code Source + DVC Pipeline :
+## 1.1. Mise de l'environement MLFLOW sur AWS : 
 
 Le but de cet etape et des crée un serveur MLFlow, qui gère le registry de nos experiences MLs:
 
@@ -73,7 +82,7 @@ mlflow.set_tracking_uri("http://ADDRESS_IP_EC2:5000")
 
 > TRES BIEN VOUS AVEZ COMPLETE CETTE ETAPE.
 
-# 2.Repository git et Code de départ :
+## 1.2.Repository git et Code de départ :
 
 Le but de cet etape est d'avoir un code de départ qui simule quelques etapes classique dans le processus ML (preprocess, train, evaluate) (des étapes qui sont utilisé dans le 'Building' de modèles.)
 
@@ -101,7 +110,7 @@ git commit -m "first commit : Starting Code"
 git push
 ```
 
-# 3. Data Originale (Source de données) :
+## 1.3. Data Originale (Source de données) :
 Pour similer une situation du monde réel avec une source de données externe dynamique nous allons crée sur notre bucket s3 un dossier dédié pour les données raw (ceci pourra venir de plusieurs sources).
 
 Dans votre bucket S3 crée les dossier ``data/raw`` et uploader votre fichier ``diabetes.csv``
@@ -112,7 +121,7 @@ Donc vous devrez avoir ce chemin dans votre bucket s3
 
 > Dans le monde réel ceci pourra simuler le resultat d'un ETL lourd
 
-# 3.Repository dvc sur s3 :
+## 1.4. Repository dvc sur s3 :
 
 > Il existe des outils pour faire le repository dvc, cependant il faut comprendre que le dvc crée un fichier d'historique des metadata des données (elle ne stocke pas les données, mais chaque push de dvc correspond à un etat 'metadata' de données, elle peut contenir le path, sans contenir les données eux memes.)
 > Cependant nous allons heberger notre repository dvc sur s3 c'est simple comme ça.
@@ -127,7 +136,7 @@ Donc vous devrez avoir ce chemin dans votre bucket s3
     conda install dvc[s3]
 
     # 1. Define where DVC should store its actual "packages" (The Cache)
-    dvc remote add -d dvcstore s3://YOUR_BUCKET_NAME/dvc_repo
+    dvc remote add -d dvcstore s3://YOUR_BUCKET_NAME
 
     # 2. Tell DVC to use your AWS credentials
     dvc remote modify dvcstore access_key_id   VOTRE_ACCESS_KEY_ID
@@ -143,19 +152,17 @@ Donc vous devrez avoir ce chemin dans votre bucket s3
 ```
 > --to-remote permet de n'a pas avoir une copie local du fichier dans le dossier du code (la copie sera telechargé ailleur et son hash md5 sera claculé et sera supprimé après), si vous l'enlever le fichier sera dans votre dossier data
 
-# 4. Adjuster votre fichier params :
+## 1.5. Adjuster votre fichier params :
 
 ex:
 ```yaml
 preprocess:
-  #input : data/raw/diabetes.csv
-  #output : data/preprocessed/data.csv
-  input : data/raw/diabetes.csv # for this to work you need to pull from dvc first or bring the file manually.
-  output : s3://VOTRE_BUCKET_S3/data/processed/data.csv
+  input: "s3://lab1-s3-yana/data/raw/diabetes.csv". # Original data source
+  output: "data/processed/data.csv" 
 
 train : 
-  data : s3://VOTRE_BUCKET_S3/data/processed/data.csv
-  model_path : models.pkl
+  data : data/processed/data.csv
+  model_path : models/model.pkl
   random_state : 42
   n_estimators: 100
   max_depth: 5
@@ -178,4 +185,3 @@ nous pouvons lancer tous le flow quand on veut avec
 dvc repro
 ```
 
-dvc remote add -d myremote s3://lab1-s3-yana
