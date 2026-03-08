@@ -10,9 +10,9 @@ train :
   max_depth: 5
 
 aws :
-  aws_access_key_id: ****
+  aws_access_key_id: ***
   aws_secret_access_key: ***
   region_name: eu-west-3
 
 mlflow:
-  MLFLOW_TRACKING_URI: http://15.188.78.74:5000/
+  MLFLOW_TRACKING_URI: http://13.36.243.42:5000/

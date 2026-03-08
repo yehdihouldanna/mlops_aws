@@ -327,3 +327,14 @@ mlflow server \
 - un service d’inférence accessible via HTTP
 
 Cela constitue une **architecture standard d’exploitation d’un modèle en production** dans un pipeline **MLOps**.
+
+
+
+
+
+creation de dossier et de fichier sur EC2,
+<!-- Dockerfile,
+requirements -->
+generatino de clé ssh,
+ajout de deploy key sur git
+pull le code sur ec2

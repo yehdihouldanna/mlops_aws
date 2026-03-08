@@ -1,0 +1,22 @@
+stages:
+  preprocess:
+    cmd: python src/preprocess.py
+    deps:
+      - src/preprocess.py
+      - params.yaml
+    outs:
+      - processed/data.csv
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - processed/data.csv
+      - params.yaml
+    outs:
+      - models/model.pkl
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+      - src/evaluate.py
+      - models/model.pkl
+      - s3://lab1-s3-yana/data/processed/data.csv

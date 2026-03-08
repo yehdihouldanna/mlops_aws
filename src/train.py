@@ -15,6 +15,12 @@ import boto3
 
 import s3fs
 
+
+
+
+# Environment variables
+MODEL_NAME = "Best_RandomForestClassifier"
+MODEL_VERSION = "latest"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 print("Starting the training Process")
@@ -96,8 +102,8 @@ def train(data_path,aws_params,model_path,random_state,n_estimators,max_depth):
         # mlflow.log_artifact("confusion_matrix.png")
 
         # logging the model :
-        mlflow.sklearn.log_model(best_model, "Best_RandomForestClassifier",
-                                 registered_model_name="Best_RandomForestClassifier",
+        mlflow.sklearn.log_model(best_model, MODEL_NAME,
+                                 registered_model_name=MODEL_NAME,
                                  signature=signature)
 
 

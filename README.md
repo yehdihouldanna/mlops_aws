@@ -129,6 +129,7 @@ Donc vous devrez avoir ce chemin dans votre bucket s3
 
 ```bash
     dvc import-url s3://YOUR_BUCKET_NAME/data/ .
+    dvc import-url s3://lab1-s3-yana/data/ .
     #dvc import-url --to-remote s3://YOUR_BUCKET_NAME/data/ .
     dvc push # now you can check on your s3 to see the result
 ```
@@ -160,7 +161,6 @@ aws :
 ```
 > Ce fichier assume que votre code preprocessing (utilise des données diabetes csv local [ou traked avec dvc et pulled]), applique le preprocessing pour sauvergarder une version preprocessed sur s3, et utlise la version sauvegardé sur s3 pour faire le training.
 > EN suite le fichier evaluate utilise le mlflow running sur ec2 pour recuperer la version nommé dans le code de votre modèle pour l'appeler.
-
 
 # La commande qui automatise le lancement des fichiers
 Maintenant avec la façon dont notre code est structuré en phases (preprocess et train)
