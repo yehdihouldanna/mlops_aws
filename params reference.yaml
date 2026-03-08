@@ -1,3 +1,8 @@
+#? this is a copy of the file params.yaml, made to avoid pushing secret_key and id to git
+#? the real_params.yaml file is put in git ignore so it doesn't get pushed.
+#? copy it to create the real params.yaml file and add you aws secret_id and key for
+#? for the code to function.
+
 preprocess:
   input: data/raw/diabetes.csv
   output: s3://lab1-s3-yana/data/processed/data.csv

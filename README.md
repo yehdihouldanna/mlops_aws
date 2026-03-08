@@ -169,3 +169,5 @@ nous pouvons lancer tous le flow quand on veut avec
 ```bash
 dvc repro
 ```
+
+dvc remote add -d myremote s3://lab1-s3-yana
