@@ -1,22 +1,30 @@
+#? These are the stages that will execute after executing 'dvc repro'
+#? For these to work you must have dvc already initiated and have already executed
+#? dvc remote add -d myremote s3://lab1-s3-yana
+#? and also aws configure in your cli.
 stages:
   preprocess:
-    cmd: python src/preprocess.py
+    cmd: python src/preprocess.py data/raw/data.csv processed/data.csv
     deps:
       - src/preprocess.py
+      - s3://lab1-s3-yana/data/raw/data.csv
       - params.yaml
     outs:
-      - processed/data.csv
+      - s3://lab1-s3-yana/data/processed/data.csv
+
   train:
-    cmd: python src/train.py
+    cmd: python src/train.py processed/data.csv models/model.pkl
     deps:
       - src/train.py
-      - processed/data.csv
+      - s3://lab1-s3-yana/data/processed/data.csv
       - params.yaml
     outs:
-      - models/model.pkl
+      - s3://lab1-s3-yana/models/model.pkl
+
   evaluate:
-    cmd: python src/evaluate.py
+    cmd: python src/evaluate.py models/model.pkl metrics.json
     deps:
       - src/evaluate.py
-      - models/model.pkl
-      - s3://lab1-s3-yana/data/processed/data.csv
+      - s3://lab1-s3-yana/models/model.pkl
+    outs:
+      - s3://lab1-s3-yana/metrics/metrics.json
