@@ -1,19 +1,28 @@
-# mlops_aws
+# Apropos de Cette Repository : 
+Ce repository contient les laboratoires du cours MLOps II – Automatisation du déploiement de modèles ML, destiné aux étudiants du SupNum (Institut Supérieur du Numérique), Master DEML M2, sous la supervision du Professeur Yehdhih ANNA.
 
-Cette repository contient la mise en place d'une simple (formulaire web) basé sur un model IA exploité via un API Flask.
-L'objective c'est d'avoir un Pipeline MLOPS Complet pour l'automatisation du système.
-Chaque changement de validation de données va lancer l'entrainement pour la création d'un nouveau modèle à jour, et la rédepoyer.
-Chqua push git va aussi mettre à jour le code du serveur, et relancer aussi l'entrainement du modèle.
+Il illustre la mise en place d’une application simple (formulaire web) basée sur un modèle d’IA accessible via une API Flask. L’objectif est de construire un pipeline MLOps complet permettant l’automatisation du système : chaque validation de données déclenche l’entraînement d’un nouveau modèle à jour et son redéploiement. De plus, chaque push sur Git met à jour le code du serveur et relance également l’entraînement du modèle.
 
-ce modèle suivant un pipeline MLOPS complet, déployé sur l'infrastructure AWS.
-Les technologies utilisé : 
-Python, Flask,
-MLFLow, dvc,
-AWS EC2, AWS IAM, AWS S3,
-HTML, CSS, JS (maybe)
-Docker
-GitHub Actions,
+Le modèle suit un pipeline MLOps complet et est déployé sur une infrastructure AWS. Les technologies utilisées incluent :
+Python, Flask, MLflow, DVC, AWS EC2, AWS IAM, AWS S3, HTML, CSS, JavaScript, Docker, GitHub Actions.
 
+
+### Technologies & Tools
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![MLflow](https://img.shields.io/badge/MLflow-000000?style=for-the-badge&logo=mlflow&logoColor=white)
+![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
+![DVC](https://img.shields.io/badge/DVC-000000?style=for-the-badge&logo=dvc&logoColor=white)
+![AWS EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![AWS IAM](https://img.shields.io/badge/AWS_IAM-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![AWS S3](https://img.shields.io/badge/AWS_S3-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
 
 # LAB 1 : Serveur MLFlow sur EC2 + Code Source + DVC Pipeline :
 ## 1.1. Mise de l'environement MLFLOW sur AWS : 
@@ -177,7 +186,7 @@ aws :
 > Ce fichier assume que votre code preprocessing (utilise des données diabetes csv local [ou traked avec dvc et pulled]), applique le preprocessing pour sauvergarder une version preprocessed sur s3, et utlise la version sauvegardé sur s3 pour faire le training.
 > EN suite le fichier evaluate utilise le mlflow running sur ec2 pour recuperer la version nommé dans le code de votre modèle pour l'appeler.
 
-# La commande qui automatise le lancement des fichiers
+### La commande qui automatise le lancement du pipeline dvc :
 Maintenant avec la façon dont notre code est structuré en phases (preprocess et train)
 nous pouvons lancer tous le flow quand on veut avec 
 
@@ -185,3 +194,288 @@ nous pouvons lancer tous le flow quand on veut avec
 dvc repro
 ```
 
+# LAB 2 : Déploiement d’un modèle MLflow avec Docker :
+
+### 2.1. Objectif du laboratoire
+
+Dans ce laboratoire, nous allons compléter notre pipeline MLOps en ajoutant une étape d’exploitation du modèle (inference / serving).
+
+L’objectif est de :
+
+1. Charger automatiquement le **dernier modèle enregistré dans le MLflow Registry**
+2. Créer une **API de prédiction**
+3. Conteneuriser cette API avec **Docker**
+4. Déployer l’API sur une instance **EC2**
+5. Communiquer avec le serveur **MLflow** via son **adresse IP**
+
+Le modèle utilisé est :
+
+```
+Best_RandomForestClassifier
+```
+
+qui a été enregistré dans le **MLflow Model Registry** lors de l'étape d'entraînement.
+
+---
+
+## 2.2. Structure du projet
+
+Nous allons ajouter un dossier pour l’exploitation du modèle.
+
+Structure finale :
+
+```
+mlops_aws
+│
+├── data
+├── models
+├── params.yaml ## this is put in git ignore because it contains sensitive ID and Key, a reference of it is given instead
+├── README.md
+├── src
+│   ├── preprocess.py
+│   ├── train.py
+│   ├── evaluate.py
+│
+├── serving
+│   └── predict_api.py # this is the inference and server file
+│
+├── requirements.txt
+└── Dockerfile
+```
+
+## 2.3. Création du script d’inférence
+vous allez remarquer que vous avez un fichier :
+serving/predict_api.py
+
+qui contient le code du serveur d'exploitation :
+
+- se connecter au **MLflow Tracking Server**
+- charger le **dernier modèle enregistré**
+- exposer une **API de prédiction**
+
+```python
+from fastapi import FastAPI
+import pandas as pd
+import mlflow
+import os
+import yaml
+
+## Chargement des paramètres
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+params_path = os.path.join(BASE_DIR, "params.yaml")
+
+params = yaml.safe_load(open(params_path))
+mlflow_params = params['mlflow']
+
+## Définition de l'adresse du serveur MLflow
+mlflow.set_tracking_uri(mlflow_params["MLFLOW_TRACKING_URI"])
+
+MODEL_NAME = "Best_RandomForestClassifier"
+MODEL_VERSION = "latest"
+
+print("Chargement du modèle depuis MLflow Registry...")
+
+model = mlflow.pyfunc.load_model(
+    model_uri=f"models:/{MODEL_NAME}/{MODEL_VERSION}"
+)
+
+print("Modèle chargé avec succès")
+
+app = FastAPI(title="API de prédiction ML")
+
+@app.get("/")
+def home():
+    return {"message": "API MLflow opérationnelle"}
+
+@app.post("/predict")
+def predict(data: dict):
+
+    df = pd.DataFrame([data])
+
+    prediction = model.predict(df)
+
+    return {
+        "prediction": int(prediction[0])
+    }
+```
+## 2.4. Configuration de la connexion au serveur MLflow
+
+Nous allons communiquer avec MLflow via son **adresse IP**.
+> Même si nous utilisons **la même instance EC2**, pour l'optimisation de ressources nous allons garder la meme approche pour montrer l'extensibilité sur plusieurs ressources.
+
+Cela permet de garder une architecture compatible si les services qui sont déployés sur **plusieurs serveurs EC2**.
+
+## 2.5. Les fichiers nécessaires : 
+### requirements.txt
+
+Vous allez remarquer un fichier requirements.txt contenant les librairies nécessaire pour le fonctionnnement du serveur basé sur FastAPI et exploitant le 'latest' model provenant de MLFlow registry.
+
+requirements.txt
+```
+fastapi
+uvicorn
+pandas
+scikit-learn
+mlflow
+boto3
+s3fs
+pyyaml
+```
+
+### Création du Dockerfile
+
+Nous allons maintenant crée un fichier Dockerfile dans notre code pour pouvoir containeriser le code du serveur sur le cloud EC2.
+
+Dockerfile
+
+```
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "serving.predict_api:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+## 2.6. Clonning du code du serveur : 
+
+Actuellement nous clonons la totalité du repository pour la simplicité : 
+mais un approche plus propre, on clonne uniquement les fichier nécessaire pour le serveur de prediciton (ces fichiers sont reduit au fichier suivant:)
+
+```bash
+.
+├── params.yaml ## Ceci devrait etre recreé manuellement pour stocker les secret aws id et key, et aussi le tracking_uri
+├── Dockerfile
+├── requirements.txt
+├── serving
+│   └── predict_api.py
+```
+
+## 2.7. Construction de l’image Docker
+
+### Installation Docker : 
+
+Pour installer docker sur ubuntu : 
+
+```bash 
+sudo apt update && sudo apt upgrade -y
+sudo apt install ca-certificates curl gnupg lsb-release -y
+sudo mkdir -m 0755 -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+```
+
+Pour verifier l'installation : 
+```bash
+sudo docker run hello-world
+```
+
+### Création de l'image docker : 
+
+Sur notre Serveur (Machine EC2 dans ce cas)
+on clone le code nécessaire dans un dossier : ex: home/username/
+`git clone repo.git`
+
+Recrée votre fichier params.yaml (ceci est dans git ignore à cause des secret id et key)
+du coup après le clonage du dossier de code, on doit recrée le fichier params.yaml
+
+et maintenant après le clone placer vous dans le dossier cloné :
+et builder votre image : 
+
+```bash
+docker build -t mlflow-model-api .
+```
+
+## 2.8. Lancement du conteneur
+IMPORTANT : Autoriser le port 8000 dans le sg (security group) de votre Instance EC2 :
+
+
+Pour que notre container puisse communiquer avec s3 on doit le lancer avec les crédentiels :
+
+```bash
+docker run -p 8000:8000 \
+  -e AWS_ACCESS_KEY_ID="your_key" \
+  -e AWS_SECRET_ACCESS_KEY="your_secret" \
+  -e AWS_DEFAULT_REGION="your_region" \
+  mlflow-model-api
+
+```
+
+### Testing the Server Backend API :
+
+Tester avec curl :
+
+```
+curl -X POST http://EC2_PUBLIC_IP:8000/predict \
+-H "Content-Type: application/json" \
+-d '{
+"Pregnancies": 6,
+"Glucose": 148,
+"BloodPressure": 72,
+"SkinThickness": 35,
+"Insulin": 0,
+"BMI": 33.6,
+"DiabetesPedigreeFunction": 0.627,
+"Age": 50
+}'
+```
+
+Réponse attendue :
+
+```
+{
+ "prediction": 1
+}
+```
+
+---
+
+## 2.8. Architecture finale
+
+Architecture du système :
+
+```
+                +----------------------+
+                |   MLflow Tracking    |
+                |       Server         |
+                |    EC2 :5000         |
+                +----------+-----------+
+                           |
+                           | accès au modèle
+                           |
+                   +-------v--------+
+                   |   Docker API   |
+                   |    FastAPI     |
+                   |    port 8000   |
+                   +-------+--------+
+                           |
+                           |
+                     Requêtes utilisateur
+```
+
+Même si les deux services sont sur **le même EC2**, ils communiquent via **l’adresse IP**.
+
+Cela permet facilement :
+
+- de séparer les services sur plusieurs machines
+- de scaler l’API indépendamment du serveur MLflow.
+
+---
+
+## 2.9. Configuration du Security Group
+
+Vérifier que l’instance EC2 autorise les ports :
+
+```
+5000   MLflow Server
+8000   API de prédiction
+```
