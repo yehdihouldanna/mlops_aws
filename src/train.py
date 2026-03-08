@@ -23,10 +23,13 @@ MODEL_NAME = "Best_RandomForestClassifier"
 MODEL_VERSION = "latest"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-print("Starting the training Process")
+
 def open_df(data_path,aws_params):
-    # Read CSV from S3
-    df = pd.read_csv(data_path, storage_options={"key": aws_params['aws_access_key_id'], "secret": aws_params['aws_secret_access_key']})
+    if data_path[0:2]=="s3":
+        # Read CSV from S3
+        df = pd.read_csv(data_path, storage_options={"key": aws_params['aws_access_key_id'], "secret": aws_params['aws_secret_access_key']})
+    else :
+        df = pd.read_csv(data_path)
     return df
 
 def hyperparameter_tuning(X_train,y_train,param_grid):
@@ -36,6 +39,8 @@ def hyperparameter_tuning(X_train,y_train,param_grid):
     return grid_search
 
 def train(data_path,aws_params,model_path,random_state,n_estimators,max_depth):
+    print("STAGE TRAIN : Starting the training process : ")
+
     data = open_df(data_path,aws_params)
     X = data.drop(columns=["Outcome"])
     y = data["Outcome"]
@@ -105,6 +110,12 @@ def train(data_path,aws_params,model_path,random_state,n_estimators,max_depth):
         mlflow.sklearn.log_model(best_model, MODEL_NAME,
                                  registered_model_name=MODEL_NAME,
                                  signature=signature)
+        
+        # 2. Save the model as a pickle file
+        with open(model_path, "wb") as f:
+            pickle.dump(best_model, f)
+            
+        print(f"Model successfully saved locally to: {model_path}")
 
 
 if __name__=="__main__":

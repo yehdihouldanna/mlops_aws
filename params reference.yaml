@@ -4,7 +4,7 @@
 #? for the code to function.
 
 preprocess:
-  input: data/raw/diabetes.csv
+  input: s3://lab1-s3-yana/data/raw/diabetes.csv
   output: s3://lab1-s3-yana/data/processed/data.csv
 
 train : 

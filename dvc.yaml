@@ -2,29 +2,33 @@
 #? For these to work you must have dvc already initiated and have already executed
 #? dvc remote add -d myremote s3://lab1-s3-yana
 #? and also aws configure in your cli.
+
+
+
+#DVC outputs are designed to be tracked files that live within your local project structure
 stages:
   preprocess:
-    cmd: python src/preprocess.py data/raw/data.csv processed/data.csv
+    cmd: python src/preprocess.py
     deps:
       - src/preprocess.py
-      - s3://lab1-s3-yana/data/raw/data.csv
+      - s3://lab1-s3-yana/data/raw/diabetes.csv
       - params.yaml
     outs:
-      - s3://lab1-s3-yana/data/processed/data.csv
+      - data/processed/data.csv  # Local path
 
   train:
-    cmd: python src/train.py processed/data.csv models/model.pkl
+    cmd: python src/train.py
     deps:
       - src/train.py
-      - s3://lab1-s3-yana/data/processed/data.csv
+      - data/processed/data.csv
       - params.yaml
     outs:
-      - s3://lab1-s3-yana/models/model.pkl
+      - models/model.pkl  # Local path
 
   evaluate:
-    cmd: python src/evaluate.py models/model.pkl metrics.json
+    cmd: python src/evaluate.py
     deps:
       - src/evaluate.py
-      - s3://lab1-s3-yana/models/model.pkl
+      - models/model.pkl
     outs:
-      - s3://lab1-s3-yana/metrics/metrics.json
+      - metrics/metrics.json  # Local path
