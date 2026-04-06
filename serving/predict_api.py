@@ -20,11 +20,14 @@ mlflow.set_tracking_uri(mlflow_params["MLFLOW_TRACKING_URI"])
 
 print("Chargement du modèle depuis MLflow Registry...")
 
-model = mlflow.pyfunc.load_model(
-    model_uri=f"models:/{MODEL_NAME}/{MODEL_VERSION}"
-)
-
-print("Modèle chargé avec succès")
+try:
+    model = mlflow.pyfunc.load_model(
+        model_uri=f"models:/{MODEL_NAME}/{MODEL_VERSION}"
+    )
+    print("Modèle chargé avec succès")
+except Exception as e:
+    print("Error loading model:", e)
+    exit(1)
 
 app = FastAPI(title="API de prédiction ML")
 
