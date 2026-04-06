@@ -6,6 +6,7 @@ Il illustre la mise en place d’une application simple (formulaire web) basée 
 Le modèle suit un pipeline MLOps complet et est déployé sur une infrastructure AWS. Les technologies utilisées incluent :
 Python, Flask, MLflow, DVC, AWS EC2, AWS IAM, AWS S3, HTML, CSS, JavaScript, Docker, GitHub Actions.
 
+---
 
 ### Technologies & Tools
 
@@ -23,6 +24,8 @@ Python, Flask, MLflow, DVC, AWS EC2, AWS IAM, AWS S3, HTML, CSS, JavaScript, Doc
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
+
+---
 
 # LAB 1 : Serveur MLFlow sur EC2 + Code Source + DVC Pipeline :
 ## 1.1. Mise de l'environement MLFLOW sur AWS : 
@@ -193,6 +196,9 @@ nous pouvons lancer tous le flow quand on veut avec
 ```bash
 dvc repro
 ```
+
+
+---
 
 # LAB 2 : Déploiement d’un modèle MLflow avec Docker :
 
