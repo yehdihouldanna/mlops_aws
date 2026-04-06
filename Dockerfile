@@ -5,13 +5,13 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install system dependencies (IMPORTANT)
-RUN apt-get update && apt-get install -y \
-    build-essential \
+RUN apk add --no-cache \
+    build-base \
     gcc \
     g++ \
     python3-dev \
-    libatlas-base-dev \
-    && rm -rf /var/lib/apt/lists/*
+    musl-dev \
+    lapack-dev
 
 RUN pip install --no-cache-dir -r requirements.txt
 
