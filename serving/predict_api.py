@@ -27,7 +27,6 @@ try:
     print("Modèle chargé avec succès")
 except Exception as e:
     print("Error loading model:", e)
-    exit(1)
 
 app = FastAPI(title="API de prédiction ML")
 
@@ -42,11 +41,13 @@ def home():
 
 @app.post("/predict")
 def predict(data: dict):
+    try:
+        df = pd.DataFrame([data])
 
-    df = pd.DataFrame([data])
+        prediction = model.predict(df)
 
-    prediction = model.predict(df)
-
-    return {
-        "prediction": int(prediction[0])
-    }
+        return {
+            "prediction": int(prediction[0])
+        }
+    except Exception as e:
+        return {"error": str(e)}
