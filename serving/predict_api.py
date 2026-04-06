@@ -28,6 +28,11 @@ print("Modèle chargé avec succès")
 
 app = FastAPI(title="API de prédiction ML")
 
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 @app.get("/")
 def home():
     return {"message": "API MLflow opérationnelle"}
