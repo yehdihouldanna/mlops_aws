@@ -10,12 +10,10 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     python3-dev \
-    libatlas-base-dev \
     libblas-dev \
     liblapack-dev \
     gfortran \
     && rm -rf /var/lib/apt/lists/*
-
 # Upgrade pip tools (important for Python 3.12)
 RUN pip install --upgrade pip setuptools wheel
 
