@@ -15,9 +15,6 @@ import boto3
 
 import s3fs
 
-
-
-
 # Environment variables
 MODEL_NAME = "Best_RandomForestClassifier"
 MODEL_VERSION = "latest"

@@ -16,9 +16,10 @@ mlflow_params = params['mlflow']
 
 # Définition de l'adresse du serveur MLflow
 mlflow.set_tracking_uri(mlflow_params["MLFLOW_TRACKING_URI"])
-
+print("mlflow tracking URI set to:", mlflow.get_tracking_uri())
 
 print("Chargement du modèle depuis MLflow Registry...")
+print("Model URI:", f"models:/{MODEL_NAME}/{MODEL_VERSION}")
 
 try:
     model = mlflow.pyfunc.load_model(

@@ -77,11 +77,13 @@ _Custom - Port 5000 - 0.0.0.0/0_
     mlflow server --host 0.0.0.0 --port 5000 --default-artifact-root s3://YOUR_BUCKET_NAME --allowed-hosts "*" --cors-allowed-origins "*" 
     cd mlflow
     pipenv shell
-    mlflow server --host 0.0.0.0 --port 5000 --default-artifact-root s3://s3://lab1-s3-yana --allowed-hosts "*" --cors-allowed-origins "*" 
+    mlflow server --host 0.0.0.0 --port 5000 --default-artifact-root s3://lab1-s3-yana --allowed-hosts "*" --cors-allowed-origins "*" 
 
 
 
     # to keeps from stopping after closing the terminal you can use this command
+    cd mlflow
+    pipenv shell
     nohup mlflow server --host 0.0.0.0 --port 5000 --default-artifact-root s3://lab1-s3-yana --allowed-hosts "*" --cors-allowed-origins "*" > mlflow.log 2>&1 &
 ```
 
