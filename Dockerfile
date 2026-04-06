@@ -5,13 +5,19 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install system dependencies (IMPORTANT)
-RUN apk add --no-cache \
-    build-base \
+RUN apt-get update && apt-get install -y \
+    build-essential \
     gcc \
     g++ \
     python3-dev \
-    musl-dev \
-    lapack-dev
+    libatlas-base-dev \
+    libblas-dev \
+    liblapack-dev \
+    gfortran \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip tools (important for Python 3.12)
+RUN pip install --upgrade pip setuptools wheel
 
 RUN pip install --no-cache-dir -r requirements.txt
 
