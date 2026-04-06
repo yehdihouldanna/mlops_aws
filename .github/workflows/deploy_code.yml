@@ -28,8 +28,9 @@ jobs:
           ssh -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
 
             cd mlflow
-            pipenv shell
-            nohup mlflow server --host 0.0.0.0 --port 5000 --default-artifact-root s3://lab1-s3-yana --allowed-hosts "*" --cors-allowed-origins "*" > mlflow.log 2>&1 &
+            pipenv run nohup mlflow server --host 0.0.0.0 --port 5000 \
+              --default-artifact-root ${{ secrets.S3_BUCKET }} \
+              --allowed-hosts "*" --cors-allowed-origins "*" > mlflow.log 2>&1 &
             cd ..
             cd ~/mlops_aws
             git pull origin main
