@@ -21,7 +21,6 @@ print("mlflow tracking URI set to:", mlflow.get_tracking_uri())
 print("Chargement du modèle depuis MLflow Registry...")
 print("Model URI:", f"models:/{MODEL_NAME}/{MODEL_VERSION}")
 
-
 model = mlflow.pyfunc.load_model(
     model_uri=f"models:/{MODEL_NAME}/{MODEL_VERSION}"
 )
