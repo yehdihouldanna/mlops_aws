@@ -1002,3 +1002,7 @@ Vous pouvez aussi déclencher le workflow de retraining manuellement depuis GitH
 -	Entrez une raison (optionnel) et cliquez sur Run workflow.
 
 Le workflow s'exécute exactement comme s'il avait été déclenché par un push de données.
+
+
+
+aws s3 cp diabetes.csv s3://lab1-s3-yana/data/raw/diabetes.csv

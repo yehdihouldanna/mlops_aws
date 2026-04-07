@@ -54,7 +54,7 @@ def health():
 
 @app.get("/")
 def home():
-    return {"message": "API MLflow opérationnelle And changed via a push"}
+    return {"message": "API MLflow opérationnelle"}
 
 
 @app.post("/predict")
