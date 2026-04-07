@@ -42,9 +42,7 @@ jobs:
           cd ~/mlops_aws
           git pull origin main
 
-          
-          
-
+  
           # 2. Build the image 
           # Note: Only use --build-arg if your Dockerfile needs them during 'docker build'
           sudo docker build \

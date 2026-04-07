@@ -488,6 +488,8 @@ Vérifier que l’instance EC2 autorise les ports :
 8000   API de prédiction
 ```
 
+---
+
 # LAB 3 : Automatisation des workflow CI/CD avec Github Actions :
 
 ### 3.1. Objectif du laboratoire
@@ -646,38 +648,51 @@ jobs:
         run: |
           ssh -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
 
-            cd mlflow
-            pipenv run nohup mlflow server --host 0.0.0.0 --port 5000 \
-              --default-artifact-root ${{ secrets.S3_BUCKET }} \
-              --allowed-hosts "*" --cors-allowed-origins "*" > mlflow.log 2>&1 &
-            cd ..
-            cd ~/mlops_aws
-            git pull origin main
+          # 1. Export variables so they exist in this specific SSH session
+          export S3_BUCKET="${{ secrets.S3_BUCKET }}"
+          export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+          export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          export AWS_DEFAULT_REGION="${{ secrets.AWS_REGION }}"
+          export MLFLOW_TRACKING_URI="${{ secrets.MLFLOW_TRACKING_URI }}"
 
-            # Rebuild Docker image
-            sudo docker build -t mlflow-model-api .
+          cd mlflow
+          pipenv run nohup mlflow server --host 0.0.0.0 --port 5000 \
+            --default-artifact-root ${{ secrets.S3_BUCKET }} \
+            --allowed-hosts "*" --cors-allowed-origins "*" > mlflow.log 2>&1 &
+          cd ..
+          cd ~/mlops_aws
+          git pull origin main
 
-            # Stop & remove old container if running
-            sudo docker stop api_container 2>/dev/null || true
-            sudo docker rm   api_container 2>/dev/null || true
+  
+          # 2. Build the image 
+          # Note: Only use --build-arg if your Dockerfile needs them during 'docker build'
+          sudo docker build \
+            --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+            --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+            -t mlflow-model-api .
 
-            # Launch new container
-            sudo docker run -d \
-              --name api_container \
-              -p 8000:8000 \
-              -e AWS_ACCESS_KEY_ID=$AWS_KEY \
-              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET \
-              -e AWS_DEFAULT_REGION=$AWS_REGION \
-              mlflow-model-api
+          # 3. Stop & remove old container
+          sudo docker stop api_container 2>/dev/null || true
+          sudo docker rm api_container 2>/dev/null || true
+
+          # 4. Launch new container - Passing the variables explicitly
+          sudo docker run -d \
+            --name api_container \
+            -p 8000:8000 \
+            -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+            -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+            -e AWS_DEFAULT_REGION="$AWS_DEFAULT_REGION" \
+            -e MLFLOW_TRACKING_URI="$MLFLOW_TRACKING_URI" \
+            mlflow-model-api
           ENDSSH
         env:
           AWS_KEY:    ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Health check
         run: |
-          sleep 15
+          sleep 30
           curl --fail http://${{ secrets.EC2_HOST }}:8000/ || exit 1
 ```
 
@@ -701,8 +716,136 @@ Après déploiement, le workflow attend `15 secondes` puis appelle GET / sur l'A
 
 ## 3.6. Workflow 2 — CI/CD Data (dvc push)
 
-TODO
+Ce workflow se déclenche manuellement (workflow_dispatch) ou sur un push contenant des fichiers .dvc modifiés. Il lance dvc repro sur l'EC2, enregistre le nouveau modèle dans MLflow, et redémarre l'API.
 
+> **Pourquoi workflow_dispatch et non un cron ?** : 
+Un cron lancerait le pipeline même si les données n'ont pas changé, ce qui gaspille des ressources et pollue le MLflow Registry.
+workflow_dispatch permet de déclencher le pipeline manuellement depuis l'interface GitHub ou via l'API.
+On ajoute également le déclencheur sur les fichiers .dvc modifiés pour une automatisation complète.
+
+3.5.1. Schéma du Workflow
+
+```bash
+dvc push  (ou push d'un fichier .dvc modifié)
+    │
+    ▼
+GitHub Actions Runner
+    │
+    ├── 1. Checkout du code
+    ├── 2. SSH → EC2
+    │        ├── git pull origin main
+    │        ├── pip install dvc[s3]
+    │        ├── dvc pull          (récupère les nouvelles données)
+    │        ├── dvc repro         (preprocess → train → evaluate)
+    │        │        ↳ MLflow log du nouveau modèle
+    │        ├── docker stop / rm api_container
+    │        └── docker run ... mlflow-model-api
+    └── 3. Health check API
+```
+
+```yaml
+name: Retrain - DVC Data Pipeline
+
+on:
+  workflow_dispatch:  # Déclenchement manuel depuis GitHub
+    inputs:
+      reason:
+        description: 'Raison du retraining'
+        required: false
+        default: 'Mise à jour des données'
+
+  push:
+    branches:
+      - main
+    paths:
+      - '**.dvc'       # Tout fichier .dvc modifié
+      - 'dvc.lock'     # Ou le fichier lock DVC
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
+          chmod 600 ~/.ssh/ec2_key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Run DVC pipeline & retrain on EC2
+        run: |
+          ssh -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
+            
+            # 1. Export variables so they exist in this specific SSH session
+            export S3_BUCKET="${{ secrets.S3_BUCKET }}"
+            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            export AWS_DEFAULT_REGION="${{ secrets.AWS_REGION }}"
+            export MLFLOW_TRACKING_URI="${{ secrets.MLFLOW_TRACKING_URI }}"
+            
+            # Launch MLFLOW server And Navigate to project directory
+            cd mlflow
+            pipenv run nohup mlflow server --host 0.0.0.0 --port 5000 \
+                --default-artifact-root ${{ secrets.S3_BUCKET }} \
+                --allowed-hosts "*" --cors-allowed-origins "*" > mlflow.log 2>&1 &
+            cd ..
+            cd ~/mlops_aws
+            git pull origin main
+
+            # Activate conda/venv if needed
+            source ~/.bashrc
+
+            # Configure AWS for DVC
+            export AWS_ACCESS_KEY_ID=$AWS_KEY
+            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET
+            export AWS_DEFAULT_REGION=$AWS_REGION
+
+            # Pull latest data from S3 via DVC
+            dvc pull
+
+            # Run full ML pipeline
+            dvc repro
+
+            echo 'Pipeline DVC terminé — nouveau modèle enregistré dans MLflow'
+
+            
+            # 2. Build the image 
+            # Note: Only use --build-arg if your Dockerfile needs them during 'docker build'
+            sudo docker build \
+                --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                -t mlflow-model-api .
+
+            # 3. Stop & remove old container
+            sudo docker stop api_container 2>/dev/null || true
+            sudo docker rm api_container 2>/dev/null || true
+
+            # 4. Launch new container - Passing the variables explicitly
+            sudo docker run -d \
+                --name api_container \
+                -p 8000:8000 \
+                -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+                -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+                -e AWS_DEFAULT_REGION="$AWS_DEFAULT_REGION" \
+                -e MLFLOW_TRACKING_URI="$MLFLOW_TRACKING_URI" \
+                mlflow-model-api
+            ENDSSH
+        env:
+          AWS_KEY:    ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          MLFLOW_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+
+      - name: Health check
+        run: |
+          sleep 20
+          curl --fail http://${{ secrets.EC2_HOST }}:8000/ || exit 1
+
+```
 
 ## 3.7. Préparer l'EC2 pour recevoir les Workflows
 
@@ -775,7 +918,6 @@ aws:
 
 ## 3.8. Pousser les Workflows et Premier Test
 
-
 #### 3.8.1. Commit et Push des fichiers de workflow
 De retour sur votre machine locale, ajoutez les fichiers workflow à git et poussez :
 
@@ -821,3 +963,42 @@ Réponse attendue :
   "prediction": 1
 }
 ```
+
+## 3.9 Tester le Workflow Data (Retraining)
+
+On va simuler un changement de données en uploadant un fichier mis à jour sur S3, puis on déclenche le workflow de retraining.
+
+#### 3.9.1 Simuler un changement de données
+
+-	Ouvrez votre fichier diabetes.csv local.
+-	Ajoutez quelques lignes de nouvelles observations (ou dupliquez quelques lignes existantes pour simuler de nouveaux enregistrements).
+-	Uploadez le fichier mis à jour sur S3 :
+
+`aws s3 cp diabetes.csv s3://YOUR_BUCKET_NAME/data/raw/diabetes.csv`
+
+#### 3.9.2. Mettre à jour le tracking DVC
+DVC doit être informé que la source de données a changé :
+
+```bash
+# Sur votre machine locale (ou directement sur l'EC2)
+dvc update
+dvc push
+
+# Committer le nouveau .dvc file (qui contient le nouveau hash md5)
+git add .
+git commit -m 'data: update diabetes dataset with new observations'
+git push origin main
+```
+>Ce push contient un fichier .dvc modifié
+Le workflow retrain_data.yml se déclenche automatiquement (chemin paths: '**.dvc').
+Il lancera dvc pull, puis dvc repro, puis enregistrera un nouveau modèle dans MLflow.
+L'API sera redémarrée avec le nouveau modèle automatiquement.
+
+#### 3.9.3. Déclencher manuellement le Workflow Data
+Vous pouvez aussi déclencher le workflow de retraining manuellement depuis GitHub, sans modifier les données :
+-	Allez sur GitHub > votre repository > onglet Actions.
+-	Dans la liste des workflows à gauche, cliquez sur Retrain - DVC Data Pipeline.
+-	Cliquez sur Run workflow (bouton bleu en haut à droite).
+-	Entrez une raison (optionnel) et cliquez sur Run workflow.
+
+Le workflow s'exécute exactement comme s'il avait été déclenché par un push de données.
