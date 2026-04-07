@@ -21,6 +21,7 @@ print("mlflow tracking URI set to:", mlflow.get_tracking_uri())
 print("Chargement du modèle depuis MLflow Registry...")
 print("Model URI:", f"models:/{MODEL_NAME}/{MODEL_VERSION}")
 
+model = None
 try:
     model = mlflow.pyfunc.load_model(
         model_uri=f"models:/{MODEL_NAME}/{MODEL_VERSION}"
@@ -43,6 +44,8 @@ def home():
 @app.post("/predict")
 def predict(data: dict):
     try:
+        if model is None:
+            return {"error": "Model not loaded"}
         df = pd.DataFrame([data])
 
         prediction = model.predict(df)
