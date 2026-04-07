@@ -487,3 +487,337 @@ Vérifier que l’instance EC2 autorise les ports :
 5000   MLflow Server
 8000   API de prédiction
 ```
+
+# LAB 3 : Automatisation des workflow CI/CD avec Github Actions :
+
+### 3.1. Objectif du laboratoire
+
+Dans ce laboratoire, nous allons ajouter des workflows (pipeline) github qui nous permettent d'automatiser la mise à jour du serveur après chaque push sur la branche principale du code, ou à la suite de chaque changement de données. (un push sur dvc)
+
+Autrement dit on ferme la boucle — chaque changement de code ou de données déclenche automatiquement le pipeline.
+
+L'objectif de ce lab est d'automatiser entièrement ces deux déclencheurs grâce à GitHub Actions :
+
+
+| Composant |	Rôle |
+|--- | ---|
+| **`git push`**	| Reconstruit et redéploie automatiquement le conteneur Docker sur EC2 |
+| **`dvc push`**	| Relance dvc repro, enregistre un nouveau modèle dans MLflow, redéploie l'API |
+
+
+---
+
+## 3.2. Structure du projet
+
+Nous allons ajouter un dossier pour la configuration des pipeline avec github actions
+
+Structure finale :
+
+```bash
+mlops_aws
+│
+├── .github/
+│   └── workflows/
+│       ├── deploy_code.yml      # Workflow 1 : déclencheur Git (code)
+│       └── retrain_data.yml     # Workflow 2 : déclencheur DVC (données)
+├── data
+├── models
+├── params.yaml ## this is put in git ignore because it contains sensitive ID and Key, a reference of it is given instead
+├── README.md
+├── src
+│   ├── preprocess.py
+│   ├── train.py
+│   ├── evaluate.py
+│
+├── serving
+│   └── predict_api.py # this is the inference and server file
+│
+├── requirements.txt
+└── Dockerfile
+```
+
+## 3.3 Notions Clès :
+
+CI/CD Traditionnel vs ML CI/CD
+Dans le DevOps traditionnel, un seul déclencheur provoque le build :
+
+**CI Traditionnel :**  `Code Change`  →  `Build`  →  `Tests`  →  `Artifact`
+
+Dans le MLOps, il y a deux déclencheurs indépendants :
+
+**ML CI (Code)  :**  `git push`    →  `Setup`  →  `docker build`  →  `redeploy`
+
+**ML CI (Data)  :**  `dvc push`    →  `Setup`  →  `dvc repro`     →  `MLflow log`  →  `redeploy`
+
+💡 Pourquoi deux pipelines ?
+Un changement de code (ex: nouveau preprocessing) ne modifie pas les données.
+Un changement de données (nouvelles observations) ne modifie pas le code.
+Les deux doivent quand même produire un nouveau modèle et redéployer l'API.
+GitHub Actions permet de définir un workflow séparé pour chaque déclencheur.
+
+GitHub Actions — Notions Fondamentales
+GitHub Actions est le moteur CI/CD intégré à GitHub. Il repose sur trois notions :
+
+-	**Workflow :** un fichier YAML dans .github/workflows/ décrivant une automation.
+- **Trigger (on:) :** l'événement qui déclenche le workflow (push, pull_request, workflow_dispatch…).
+- **Job / Step :** un job est un ensemble d'étapes (steps) qui s'exécutent sur un runner.
+
+Structure minimale d'un workflow :
+
+```
+name: Mon Workflow
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  mon-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Ma commande
+        run: echo 'Hello MLOps !'
+```
+
+#### GitHub Secrets — Gestion des Credentials
+Les clés AWS et la clé SSH de votre instance EC2 ne doivent jamais apparaître dans le code. GitHub Secrets les stocke de façon chiffrée et les injecte dans le workflow comme variables d'environnement.
+
+> 🔐 Règle de sécurité fondamentale : 
+Ne jamais committer une clé AWS, un mot de passe ou une clé SSH dans git.
+Même dans un repository privé : les secrets appartiennent à GitHub Secrets, pas au code.
+
+## 3.4. Configuration des GitHub Secrets
+
+GitHub Secrets permet de stocker des informations sensibles qui seront injectées dans les workflows sous forme de variables d'environnement, sans jamais les exposer dans les logs ni dans le code.
+
+### 3.2.1. Accéder aux Secrets du Repository
+5.	Allez sur votre repository GitHub.
+6.	Cliquez sur Settings (onglet en haut à droite).
+7.	Dans le menu gauche, choisissez Secrets and variables > Actions.
+8.	Cliquez sur New repository secret pour chaque secret listé ci-dessous.
+
+### 3.2.2. Liste des Secrets à créer
+|Composant	| Rôle |
+| --- | --- |
+EC2_HOST |	Adresse IP publique de votre instance EC2 (ex: 54.210.x.x)
+EC2_USER	| Utilisateur SSH de l'instance par défaut pour une novuelle machine EC2 c'est `ubuntu` (pour un OS Linux Ubuntu)
+EC2_SSH_KEY	| Contenu complet du fichier .pem (clé privée SSH) , verifier dans vos téléchargements (chercher avec l'extension `*.pem`), c'est le fichier crée lors de la création de la machine EC2
+AWS_ACCESS_KEY_ID	| Votre Access Key ID AWS
+AWS_SECRET_ACCESS_KEY	|Votre Secret Access Key AWS
+AWS_DEFAULT_REGION	| Région AWS de vos ressources (ex: eu-west-3)
+MLFLOW_TRACKING_URI	| URL du serveur MLflow (ex: http://54.210.x.x:5000)
+
+
+## 3.5. Workflow 1 — CI/CD Code (git push) :
+après avoir crée un fichier vide deploy_code.yml (dans .github/workflows)
+
+voici le contenu de ce fichier : 
+
+```yml
+name: Deploy Code - Build & Redeploy API
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'data/**'
+      - '*.dvc'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
+          chmod 600 ~/.ssh/ec2_key.pem
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'ENDSSH'
+
+            cd mlflow
+            pipenv run nohup mlflow server --host 0.0.0.0 --port 5000 \
+              --default-artifact-root ${{ secrets.S3_BUCKET }} \
+              --allowed-hosts "*" --cors-allowed-origins "*" > mlflow.log 2>&1 &
+            cd ..
+            cd ~/mlops_aws
+            git pull origin main
+
+            # Rebuild Docker image
+            sudo docker build -t mlflow-model-api .
+
+            # Stop & remove old container if running
+            sudo docker stop api_container 2>/dev/null || true
+            sudo docker rm   api_container 2>/dev/null || true
+
+            # Launch new container
+            sudo docker run -d \
+              --name api_container \
+              -p 8000:8000 \
+              -e AWS_ACCESS_KEY_ID=$AWS_KEY \
+              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET \
+              -e AWS_DEFAULT_REGION=$AWS_REGION \
+              mlflow-model-api
+          ENDSSH
+        env:
+          AWS_KEY:    ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Health check
+        run: |
+          sleep 15
+          curl --fail http://${{ secrets.EC2_HOST }}:8000/ || exit 1
+```
+
+### Explication des blocs clés
+
+**Le déclencheur (on:)**
+
+Le workflow se déclenche uniquement sur les push vers main. L'option paths-ignore évite un redéploiement inutile quand seuls des fichiers .dvc ou le README changent.
+
+**La configuration SSH**
+
+Le secret `EC2_SSH_KEY` est écrit dans un fichier temporaire `~/.ssh/ec2_key.pem` sur le runner. Le `chmod 600` est obligatoire : SSH refuse d'utiliser une clé avec des permissions trop ouvertes.
+
+**Le heredoc SSH**
+
+Le bloc `<< 'ENDSSH'` permet d'envoyer plusieurs commandes en une seule connexion SSH. Le `|| true` sur les commandes `docker stop/rm` évite que le workflow échoue si le conteneur n'existe pas encore.
+
+**Le Health Check**
+
+Après déploiement, le workflow attend `15 secondes` puis appelle GET / sur l'API. Si l'API ne répond pas, le step échoue et GitHub marque le workflow en erreur — vous êtes notifié.
+
+## 3.6. Workflow 2 — CI/CD Data (dvc push)
+
+TODO
+
+
+## 3.7. Préparer l'EC2 pour recevoir les Workflows
+
+Le runner GitHub Actions va se connecter en SSH à l'EC2 et exécuter des commandes. L'EC2 doit être prête à recevoir ces commandes sans intervention manuelle.
+
+#### 3.6.1. Cloner le repository sur l'EC2
+Si ce n'est pas déjà fait (Lab 2), clonez votre repository sur l'EC2 dans le dossier `~/mlops_aws` :
+
+```bash 
+ssh -i your-key.pem ubuntu@EC2_PUBLIC_IP
+
+# Générer une clé SSH pour GitHub (si pas déjà fait)
+ssh-keygen -t ed25519 -C 'ec2-mlops' -f ~/.ssh/id_ed25519 -N ''
+cat ~/.ssh/id_ed25519.pub
+# → Copiez cette clé publique dans GitHub > Settings > SSH Keys
+
+# Cloner le repository
+cd ~
+git clone git@github.com:USERNAME/YOUR_REPOSITORY_NAME.git mlops_aws
+```
+
+#### 3.6.2. Installer les dépendances sur l'EC2
+Les workflows vont exécuter dvc repro et docker build directement sur l'EC2. Assurez-vous que les outils sont installés :
+
+```bash
+# Python & pip
+sudo apt update
+sudo apt install python3-pip python3-venv -y
+
+# DVC avec support S3
+pip3 install 'dvc[s3]' --break-system-packages
+
+# Docker (si pas déjà installé – voir Lab 2)
+sudo docker --version
+
+# Vérifier que git est configuré
+git config --global user.email 'ec2@mlops.lab'
+git config --global user.name 'EC2 MLOps Runner'
+```
+
+#### 3.6.3. Recreer le fichier params.yaml
+Rappel : `params.yaml` est dans le `.gitignore` car il contient les secrets AWS. Il faut le recréer manuellement sur l'EC2 après le clonage :
+
+```bash
+cd ~/mlops_aws
+nano params.yaml
+```
+
+Remplir son contenu à partir de cela :
+```yml
+preprocess:
+  input:  's3://YOUR_BUCKET_NAME/data/raw/diabetes.csv'
+  output: 'data/processed/data.csv'
+
+train:
+  data:          data/processed/data.csv
+  model_path:    models/model.pkl
+  random_state:  42
+  n_estimators:  100
+  max_depth:     5
+
+mlflow:
+  MLFLOW_TRACKING_URI: 'http://EC2_PUBLIC_IP:5000'
+
+aws:
+  aws_access_key_id:     YOUR_ACCESS_KEY_ID
+  aws_secret_access_key: YOUR_SECRET_ACCESS_KEY
+  region_name:           YOUR_REGION # should be eu-west-3 pour paris
+```
+
+## 3.8. Pousser les Workflows et Premier Test
+
+
+#### 3.8.1. Commit et Push des fichiers de workflow
+De retour sur votre machine locale, ajoutez les fichiers workflow à git et poussez :
+
+```bash
+git add .github/
+git commit -m 'lab3: add GitHub Actions CI/CD workflows'
+git push origin main
+```
+
+> Ce push va déclencher le Workflow 1 (deploy_code.yml) immédiatement !
+Allez dans `GitHub` > `votre repository` > onglet `Actions`.
+Vous verrez le workflow `'Deploy Code - Build & Redeploy API'` s'exécuter.
+Cliquez dessus pour voir les logs en temps réel à chaque step.
+
+#### 3.8.2. Suivre l'exécution dans GitHub Actions
+-	Allez sur `GitHub` > `votre repository` > `onglet Actions.`
+-	Cliquez sur le workflow en cours d'exécution.
+-	Cliquez sur le job deploy pour voir les logs step by step.
+-	Vérifiez que chaque step est vert (✓). En cas d'erreur, lisez le log du step rouge.
+
+#### 3.8.3. Tester l'API après déploiement
+Une fois le workflow terminé (toutes les étapes vertes), testez l'API déployée :
+
+```bash
+curl -X POST http://EC2_PUBLIC_IP:8000/predict \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "Pregnancies": 6,
+    "Glucose": 148,
+    "BloodPressure": 72,
+    "SkinThickness": 35,
+    "Insulin": 0,
+    "BMI": 33.6,
+    "DiabetesPedigreeFunction": 0.627,
+    "Age": 50
+  }'
+```
+
+Réponse attendue :
+
+```bash
+{
+  "prediction": 1
+}
+```
