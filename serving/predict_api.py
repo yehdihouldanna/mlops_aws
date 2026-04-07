@@ -3,30 +3,49 @@ import pandas as pd
 import mlflow
 import os
 import yaml
+from contextlib import asynccontextmanager
+import traceback
 
-# Environment variables
 MODEL_NAME = "Best_RandomForestClassifier"
 MODEL_VERSION = "latest"
-# Chargement des paramètres
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 params_path = os.path.join(BASE_DIR, "params.yaml")
 
 params = yaml.safe_load(open(params_path))
 mlflow_params = params['mlflow']
 
-# Définition de l'adresse du serveur MLflow
 mlflow.set_tracking_uri(mlflow_params["MLFLOW_TRACKING_URI"])
-print("mlflow tracking URI set to:", mlflow.get_tracking_uri())
 
-print("Chargement du modèle depuis MLflow Registry...")
-print("Model URI:", f"models:/{MODEL_NAME}/{MODEL_VERSION}")
+model = None
 
-model = mlflow.pyfunc.load_model(
-    model_uri=f"models:/{MODEL_NAME}/{MODEL_VERSION}"
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model
+
+    print("mlflow tracking URI set to:", mlflow.get_tracking_uri(), flush=True)
+    print("Chargement du modèle depuis MLflow Registry...", flush=True)
+    print("Model URI:", f"models:/{MODEL_NAME}/{MODEL_VERSION}", flush=True)
+
+    try:
+        model = mlflow.pyfunc.load_model(
+            model_uri=f"models:/{MODEL_NAME}/{MODEL_VERSION}"
+        )
+        print("✅ Modèle chargé avec succès", flush=True)
+
+    except Exception as e:
+        print("❌ ERROR loading model:", str(e), flush=True)
+        traceback.print_exc()
+
+    yield  # app runs here
+
+    print("🔻 Shutting down app", flush=True)
+
+
+app = FastAPI(
+    title="API de prédiction ML",
+    lifespan=lifespan
 )
-print("Modèle chargé avec succès")
-
-app = FastAPI(title="API de prédiction ML")
 
 
 @app.get("/health")
@@ -37,13 +56,13 @@ def health():
 def home():
     return {"message": "API MLflow opérationnelle And changed via a push"}
 
+
 @app.post("/predict")
 def predict(data: dict):
-    
-    df = pd.DataFrame([data])
+    if model is None:
+        return {"error": "Model not loaded"}
 
+    df = pd.DataFrame([data])
     prediction = model.predict(df)
 
-    return {
-        "prediction": int(prediction[0])
-    }
+    return {"prediction": int(prediction[0])}
