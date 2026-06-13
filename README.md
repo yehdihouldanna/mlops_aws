@@ -1006,3 +1006,38 @@ Le workflow s'exécute exactement comme s'il avait été déclenché par un push
 
 
 aws s3 cp diabetes.csv s3://lab1-s3-yana/data/raw/diabetes.csv
+
+
+En se basant sur ce read_me et les labs elaboré, et les instruction du projet suivantes, je veux que tu me crée une énonce de projet redigé avec une modalité de notation claires et bien detaillés au niveau de 0.5 de détails.
+
+ les élèves sont sensé maintenant utiliser leur connaissances pour faire un projet : Machine Learning avec MLOPs complet, 
+Le rendu attendu des étudiants :
+le developpement d'une application utilisant un modèle IA,
+
+un serveur MLFlow deployé sur une machine EC2, avec les artéfacts stocké sur S3;
+Le circuit ML de l'application doit etre automatisé en stages avec dvc (la source de données doit etre declaré) ML (ceci devrait inclure preprocessing du data), entrainement du modèle, evaluation du modèle, et enregistrement du modèle sur MLFlow registry
+
+l'application doit tourner en en tant que API qui expose les APIs pour exploiter le modèle lancer de predictions ...
+L'application devrait avoir une interface pour interagir avec le moddèle 
+
+Le CI/CD devrait etre automatique (vous etes libres d'utiliser Github action ou autre outils qui font la meme tant que vous arriver à automatiser les workflows à base de merges)
+
+le code github devrait etre structuré comme suit : 
+git et secrets
+branch main (prod)
+branch staging (groupage des branches dev)
+branch dev-MATRICULE (chaque eleve dans la groupe doit avoir sa propre branch dans l'historique git)
+est toutes les élèves devraient contribuer.
+
+le trigger pour le rédeploiement du code devrait etre un merge sur la branch main (prod)
+
+un second workflow devrait prendre en considerations l'ajout / changement de données, vous etes libres de choisire le declencheur dans ce cas (cron, manuelle (tant que workflow est configurés))
+
+les groupes sont de 4 personnes vous devrait communiquer avant ce samedi une liste consolidés de la distribution des groupes 
+
+Minimiser les ressources vous devrait utiliser une seul machine EC2 t3.medium or t2.medium.
+pour la machine EC2, (je vous prie d'utiliser une seul par groupe.) si vous trouvez des problèmes relative au deployement (manque d'espace vous pouvez augmenter le volume ebs de la machine de 10 GB.)
+
+Suite à des feedback précédents la modalité de notation sur 19 est suivant une gris de note stricte est claire.
+
+1 point est reservé au personnes les plus assidues. factoré par le groupe (soit 0.5 supplementaire comme la note du groupe est partagé.)
